@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -49,6 +50,7 @@ import com.android.volley.toolbox.JsonArrayRequest
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
+import java.nio.charset.Charset
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -127,15 +129,14 @@ class MainActivity : ComponentActivity() {
         val jsonObjectRequest = JsonObjectRequest(
             Request.Method.POST, url, jsonBody,
             { response ->
-                val fullName = response.optString("fullName", "User")
+                val fullName = response.optString("full_name", response.optString("fullName", "User"))
                 val role = response.optString("role", "STUDENT")
                 Toast.makeText(context, "Welcome $fullName ($role)", Toast.LENGTH_LONG).show()
                 onSuccess(response, role)
             },
             { error ->
                 Log.e("LOGIN_ERROR", "Status Code: ${error.networkResponse?.statusCode}")
-                Toast.makeText(context, "Login Failed! Invalid credentials.", Toast.LENGTH_LONG)
-                    .show()
+                Toast.makeText(context, "Login Failed! Invalid credentials.", Toast.LENGTH_LONG).show()
             }
         )
         queue.add(jsonObjectRequest)
@@ -156,55 +157,44 @@ class MainActivity : ComponentActivity() {
 
         val jsonBody = JSONObject()
         jsonBody.put("fullName", name)
+        jsonBody.put("full_name", name)
         jsonBody.put("email", email)
         jsonBody.put("password", password)
         jsonBody.put("role", role)
 
-        jsonBody.put("regNumber", if (role == "STUDENT") regNo else null)
-        jsonBody.put("companyName", if (role == "STUDENT") compName else null)
+        if (role == "STUDENT") {
+            jsonBody.put("regNumber", regNo)
+            jsonBody.put("reg_number", regNo)
+            jsonBody.put("companyName", compName)
+            jsonBody.put("company_name", compName)
+        } else {
+            jsonBody.put("regNumber", JSONObject.NULL)
+            jsonBody.put("reg_number", JSONObject.NULL)
+            jsonBody.put("companyName", JSONObject.NULL)
+            jsonBody.put("company_name", JSONObject.NULL)
+        }
 
         val jsonObjectRequest = JsonObjectRequest(
-            Request.Method.POST,
-            url,
-            jsonBody,
+            Request.Method.POST, url, jsonBody,
             { _ ->
-                Toast.makeText(
-                    context,
-                    "Registration Successful! Please Login.",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(context, "Registration Successful! Please Login.", Toast.LENGTH_LONG).show()
                 onComplete()
             },
             { error ->
                 val statusCode = error.networkResponse?.statusCode
-
                 val errorBody = try {
-                    error.networkResponse?.data?.let {
-                        String(it, Charsets.UTF_8)
-                    } ?: "No error body received"
+                    error.networkResponse?.data?.let { String(it, Charsets.UTF_8) } ?: "No error body"
                 } catch (e: Exception) {
                     "Could not read error body"
                 }
-
                 Log.e("REG_ERROR", "Status Code: $statusCode")
                 Log.e("REG_ERROR", "Response Body: $errorBody")
-
-                Toast.makeText(
-                    context,
-                    "Error $statusCode: $errorBody",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(context, "Error $statusCode: $errorBody", Toast.LENGTH_LONG).show()
             }
         )
-
         queue.add(jsonObjectRequest)
     }
-
 }
-
-
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -249,7 +239,6 @@ fun LoginScreen(onLoginClick: (String, String, Context) -> Unit, onNavigateToReg
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-
         Text(
             text = "Don't have an account? Register here",
             color = Color(0xFF1565C0), fontSize = 14.sp, fontWeight = FontWeight.Bold,
@@ -324,13 +313,12 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-
-
 @Composable
 fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     var activityDescription by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val fullName = user.optString("fullName", "Student")
+
+    val fullName = user.optString("full_name", user.optString("fullName", "Student"))
     val studentId = user.optLong("id", 0L)
     val logbookEntries = remember { mutableStateListOf<JSONObject>() }
 
@@ -356,8 +344,11 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
 
         val jsonBody = JSONObject()
         jsonBody.put("studentId", studentId)
+        jsonBody.put("student_id", studentId)
         jsonBody.put("activityDescription", description)
+        jsonBody.put("activity_description", description)
         jsonBody.put("imageUrl", "")
+        jsonBody.put("image_url", "")
 
         val jsonObjectRequest = JsonObjectRequest(Request.Method.POST, url, jsonBody,
             { _ ->
@@ -393,7 +384,7 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Status: ${entry.optString("status")}", fontWeight = FontWeight.Bold)
-                    Text(text = entry.optString("activityDescription"))
+                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")))
                     Text(text = "Grade: ${entry.optString("grade", "-")}", color = Color.Blue)
                     Text(text = "Feedback: ${entry.optString("feedback", "No comment")}", color = Color.Gray)
                 }
@@ -410,7 +401,7 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     var selectedEntryId by remember { mutableLongStateOf(-1L) }
     var inputGrade by remember { mutableStateOf("") }
     var inputFeedback by remember { mutableStateOf("") }
-    val supervisorName = user.optString("fullName", "Supervisor")
+    val supervisorName = user.optString("full_name", user.optString("fullName", "Supervisor"))
 
     fun fetchPending() {
         val url = "http://10.0.2.2:8085/api/logbook/pending"
@@ -459,8 +450,10 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         OutlinedTextField(value = inputGrade, onValueChange = { inputGrade = it }, label = { Text("Grade") })
                         OutlinedTextField(value = inputFeedback, onValueChange = { inputFeedback = it }, label = { Text("Feedback") })
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row {
                             Button(onClick = { reviewLogbook(selectedEntryId, inputGrade, inputFeedback) }) { Text("Submit") }
+                            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
                             Button(onClick = { selectedEntryId = -1L }) { Text("Cancel") }
                         }
                     }
@@ -471,7 +464,7 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
             Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedEntryId = entry.optLong("id") }) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Logbook ID: #${entry.optLong("id")}")
-                    Text(text = entry.optString("activityDescription"))
+                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")))
                 }
             }
         }
@@ -483,31 +476,127 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     val context = LocalContext.current
     var totalStudents by remember { mutableLongStateOf(0L) }
     var totalSupervisors by remember { mutableLongStateOf(0L) }
-    val adminName = user.optString("fullName", "Admin")
+    val userList = remember { mutableStateListOf<JSONObject>() }
+    val adminName = user.optString("full_name", user.optString("fullName", "Admin"))
 
-    LaunchedEffect(Unit) {
-        val url = "http://10.0.2.2:8085/api/admin/stats"
+    // Function ya kuvuta Stats na Watumiaji wote
+    fun loadAdminData() {
         val queue = Volley.newRequestQueue(context)
-        val req = JsonObjectRequest(Request.Method.GET, url, null,
+
+        // 1. Stats
+        val statsUrl = "http://10.0.2.2:8085/api/admin/stats"
+        val statsReq = JsonObjectRequest(Request.Method.GET, statsUrl, null,
             { res ->
-                totalStudents = res.optLong("totalStudents", 0L)
-                totalSupervisors = res.optLong("totalSupervisors", 0L)
+                totalStudents = res.optLong("total_students", res.optLong("totalStudents", 0L))
+                totalSupervisors = res.optLong("total_supervisors", res.optLong("totalSupervisors", 0L))
             },
             { Log.e("ADMIN_ERR", "Failed stats") }
         )
-        queue.add(req)
+        queue.add(statsReq)
+
+        // 2. Orodha ya watumiaji wote (Kutoka kwenye meza ya Users ya Spring Boot)
+        val usersUrl = "http://10.0.2.2:8085/api/admin/users"
+        val usersReq = JsonArrayRequest(Request.Method.GET, usersUrl, null,
+            { response ->
+                userList.clear()
+                for (i in 0 until response.length()) {
+                    userList.add(response.getJSONObject(i))
+                }
+            },
+            { Log.e("ADMIN_ERR", "Failed to fetch users list") }
+        )
+        queue.add(usersReq)
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("ADMIN: $adminName", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
-        Spacer(modifier = Modifier.height(24.dp))
-        Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Total Students: $totalStudents", fontSize = 18.sp)
-                Text("Total Supervisors: $totalSupervisors", fontSize = 18.sp)
+    LaunchedEffect(Unit) { loadAdminData() }
+
+    // NJIA MPYA: Function ya kufuta mtumiaji (DELETE request ya Spring Boot)
+    fun deleteUser(userId: Long) {
+        val url = "http://10.0.2.2:8085/api/admin/users/$userId"
+        val queue = Volley.newRequestQueue(context)
+
+        val deleteReq = JsonObjectRequest(Request.Method.DELETE, url, null,
+            { _ ->
+                Toast.makeText(context, "User Deleted Successfully!", Toast.LENGTH_SHORT).show()
+                loadAdminData() // Inapakia upya data baada ya kufuta
+            },
+            { error ->
+                // Kama endpoint yako ya Spring Boot inarudisha text tupu au 200 bila body, Volley inaweza kuingia hapa.
+                if (error.networkResponse?.statusCode == 200) {
+                    Toast.makeText(context, "User Deleted!", Toast.LENGTH_SHORT).show()
+                    loadAdminData()
+                } else {
+                    Toast.makeText(context, "Failed to delete user.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+        queue.add(deleteReq)
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        item {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("ADMIN: $adminName", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("System Overview", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
+                    Text("Total Students: $totalStudents", fontSize = 15.sp)
+                    Text("Total Supervisors: $totalSupervisors", fontSize = 15.sp)
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = "Manage All Registered Users",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                color = Color.DarkGray
+            )
+        }
+
+        // Kitanzi (Loop) ya kuonyesha kila mtumiaji na kitufe cha kudelete
+        items(userList) { sysUser ->
+            val id = sysUser.optLong("id")
+            val name = sysUser.optString("full_name", sysUser.optString("fullName", "No Name"))
+            val uEmail = sysUser.optString("email", "No Email")
+            val uRole = sysUser.optString("role", "STUDENT")
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(text = "Email: $uEmail", fontSize = 13.sp, color = Color.Gray)
+                        Text(text = "Role: $uRole", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1565C0))
+                    }
+
+                    // Kitufe cha kufuta mtumiaji
+                    Button(
+                        onClick = { deleteUser(id) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFCDD2)),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(text = "DELETE", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,10 +26,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.volley.Request
@@ -50,7 +53,9 @@ import com.android.volley.toolbox.JsonArrayRequest
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
-import java.nio.charset.Charset
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -184,7 +189,7 @@ class MainActivity : ComponentActivity() {
                 val statusCode = error.networkResponse?.statusCode
                 val errorBody = try {
                     error.networkResponse?.data?.let { String(it, Charsets.UTF_8) } ?: "No error body"
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     "Could not read error body"
                 }
                 Log.e("REG_ERROR", "Status Code: $statusCode")
@@ -201,6 +206,7 @@ class MainActivity : ComponentActivity() {
 fun LoginScreen(onLoginClick: (String, String, Context) -> Unit, onNavigateToRegister: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Column(
@@ -220,8 +226,20 @@ fun LoginScreen(onLoginClick: (String, String, Context) -> Unit, onNavigateToReg
         OutlinedTextField(
             value = password, onValueChange = { password = it },
             label = { Text("Password") }, modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                val buttonText = if (passwordVisible) "HIDE" else "SHOW"
+                Text(
+                    text = buttonText,
+                    color = Color(0xFF2E7D32),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .clickable { passwordVisible = !passwordVisible }
+                        .padding(end = 8.dp)
+                )
+            }
         )
 
         Button(
@@ -253,6 +271,7 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     var selectedRole by remember { mutableStateOf("STUDENT") }
     var regNumber by remember { mutableStateOf("") }
     var companyName by remember { mutableStateOf("") }
@@ -269,7 +288,25 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
 
             OutlinedTextField(value = fullName, onValueChange = { fullName = it }, label = { Text("Full Name") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
             OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email Address") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-            OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+
+            OutlinedTextField(
+                value = password, onValueChange = { password = it },
+                label = { Text("Password") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    val buttonText = if (passwordVisible) "HIDE" else "SHOW"
+                    Text(
+                        text = buttonText,
+                        color = Color(0xFF1565C0),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .clickable { passwordVisible = !passwordVisible }
+                            .padding(end = 8.dp)
+                    )
+                }
+            )
 
             Text(text = "Select Your Role:", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.fillMaxWidth())
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -342,11 +379,15 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         val url = "http://10.0.2.2:8085/api/logbook/submit"
         val queue = Volley.newRequestQueue(context)
 
+        val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
         val jsonBody = JSONObject()
         jsonBody.put("studentId", studentId)
         jsonBody.put("student_id", studentId)
         jsonBody.put("activityDescription", description)
         jsonBody.put("activity_description", description)
+        jsonBody.put("entryDate", currentDate)
+        jsonBody.put("entry_date", currentDate)
         jsonBody.put("imageUrl", "")
         jsonBody.put("image_url", "")
 
@@ -381,9 +422,14 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
             }
         }
         items(logbookEntries) { entry ->
+            val date = entry.optString("entry_date", entry.optString("entryDate", "No Date"))
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Status: ${entry.optString("status")}", fontWeight = FontWeight.Bold)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Status: ${entry.optString("status")}", fontWeight = FontWeight.Bold)
+                        Text(text = "Date: $date", fontSize = 12.sp, color = Color.DarkGray)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")))
                     Text(text = "Grade: ${entry.optString("grade", "-")}", color = Color.Blue)
                     Text(text = "Feedback: ${entry.optString("feedback", "No comment")}", color = Color.Gray)
@@ -393,6 +439,7 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     }
 }
 
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
@@ -403,7 +450,7 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     var inputFeedback by remember { mutableStateOf("") }
     val supervisorName = user.optString("full_name", user.optString("fullName", "Supervisor"))
 
-    fun fetchPending() {
+    fun fetchAllLogbooks() {
         val url = "http://10.0.2.2:8085/api/logbook/pending"
         val queue = Volley.newRequestQueue(context)
         val jsonArrayRequest = JsonArrayRequest(Request.Method.GET, url, null,
@@ -416,21 +463,21 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         queue.add(jsonArrayRequest)
     }
 
-    LaunchedEffect(Unit) { fetchPending() }
+    LaunchedEffect(Unit) { fetchAllLogbooks() }
 
-    fun reviewLogbook(id: Long, grade: String, feedback: String) {
+    fun reviewLogbook(id: Long, grade: String, feedback: String, status: String) {
         val url = "http://10.0.2.2:8085/api/logbook/review/$id"
         val queue = Volley.newRequestQueue(context)
         val body = JSONObject()
-        body.put("status", "APPROVED")
-        body.put("grade", grade)
+        body.put("status", status)
+        body.put("grade", if (status == "APPROVED") grade else "-")
         body.put("feedback", feedback)
 
         val req = JsonObjectRequest(Request.Method.PUT, url, body,
             { _ ->
                 selectedEntryId = -1L
-                fetchPending()
-                Toast.makeText(context, "Approved!", Toast.LENGTH_SHORT).show()
+                fetchAllLogbooks()
+                Toast.makeText(context, "Review Saved ($status)!", Toast.LENGTH_SHORT).show()
             },
             { Toast.makeText(context, "Failed to update", Toast.LENGTH_SHORT).show() }
         )
@@ -439,38 +486,77 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
 
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("SUPERVISOR: $supervisorName", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("SUPERVISOR: $supervisorName", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                 Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
             }
         }
         if (selectedEntryId != -1L) {
             item {
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        OutlinedTextField(value = inputGrade, onValueChange = { inputGrade = it }, label = { Text("Grade") })
-                        OutlinedTextField(value = inputFeedback, onValueChange = { inputFeedback = it }, label = { Text("Feedback") })
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row {
-                            Button(onClick = { reviewLogbook(selectedEntryId, inputGrade, inputFeedback) }) { Text("Submit") }
-                            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                            Button(onClick = { selectedEntryId = -1L }) { Text("Cancel") }
+                        Text("Review Logbook Report", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        OutlinedTextField(value = inputGrade, onValueChange = { inputGrade = it }, label = { Text("Grade (e.g. A, B, C)") }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                        OutlinedTextField(value = inputFeedback, onValueChange = { inputFeedback = it }, label = { Text("Feedback / Comment") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            Button(
+                                onClick = { reviewLogbook(selectedEntryId, inputGrade, inputFeedback, "APPROVED") },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                            ) { Text("APPROVE") }
+
+                            Button(
+                                onClick = { reviewLogbook(selectedEntryId, "", inputFeedback, "REJECTED") },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            ) { Text("REJECT") }
+
+                            Button(
+                                onClick = { selectedEntryId = -1L },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                            ) { Text("Cancel") }
                         }
                     }
                 }
             }
         }
         items(allEntries) { entry ->
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedEntryId = entry.optLong("id") }) {
+            val date = entry.optString("entry_date", entry.optString("entryDate", "No Date"))
+
+            val studentName = entry.optJSONObject("student")?.optString("fullName", "Student")
+                ?: entry.optString("student_name", "Unknown Student")
+            val regNo = entry.optJSONObject("student")?.optString("regNumber", "N/A")
+                ?: entry.optString("reg_number", "N/A")
+            val companyName = entry.optJSONObject("student")?.optString("companyName", "N/A")
+                ?: entry.optString("company_name", "N/A")
+            val currentStatus = entry.optString("status", "PENDING")
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedEntryId = entry.optLong("id") },
+                colors = CardDefaults.cardColors(
+                    containerColor = when(currentStatus) {
+                        "APPROVED" -> Color(0xFFE8F5E9)
+                        "REJECTED" -> Color(0xFFFFEBEE)
+                        else -> Color.White
+                    }
+                )
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Logbook ID: #${entry.optLong("id")}")
-                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Logbook ID: #${entry.optLong("id")} ($currentStatus)", fontWeight = FontWeight.Bold)
+                        Text(text = date, fontSize = 12.sp, color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "Student: $studentName", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(text = "Reg No: $regNo | Company: $companyName", fontSize = 12.sp, color = Color.DarkGray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")), fontSize = 14.sp)
                 }
             }
         }
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     val context = LocalContext.current
@@ -478,12 +564,16 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     var totalSupervisors by remember { mutableLongStateOf(0L) }
     val userList = remember { mutableStateListOf<JSONObject>() }
     val adminName = user.optString("full_name", user.optString("fullName", "Admin"))
+    val adminId = user.optLong("id", -1L)
 
-    // Function ya kuvuta Stats na Watumiaji wote
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    var selectedStudentForLogs by remember { mutableStateOf<JSONObject?>(null) }
+    val studentLogsList = remember { mutableStateListOf<JSONObject>() }
+
     fun loadAdminData() {
         val queue = Volley.newRequestQueue(context)
 
-        // 1. Stats
         val statsUrl = "http://10.0.2.2:8085/api/admin/stats"
         val statsReq = JsonObjectRequest(Request.Method.GET, statsUrl, null,
             { res ->
@@ -494,13 +584,18 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         )
         queue.add(statsReq)
 
-        // 2. Orodha ya watumiaji wote (Kutoka kwenye meza ya Users ya Spring Boot)
         val usersUrl = "http://10.0.2.2:8085/api/admin/users"
         val usersReq = JsonArrayRequest(Request.Method.GET, usersUrl, null,
             { response ->
                 userList.clear()
                 for (i in 0 until response.length()) {
-                    userList.add(response.getJSONObject(i))
+                    val u = response.getJSONObject(i)
+                    val role = u.optString("role", "STUDENT")
+                    val uId = u.optLong("id", -1L)
+
+                    if (uId != adminId && role != "ADMIN") {
+                        userList.add(u)
+                    }
                 }
             },
             { Log.e("ADMIN_ERR", "Failed to fetch users list") }
@@ -508,9 +603,21 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         queue.add(usersReq)
     }
 
+    fun fetchStudentLogbooks(studentId: Long) {
+        val url = "http://10.0.2.2:8085/api/logbook/student/$studentId"
+        val queue = Volley.newRequestQueue(context)
+        val jsonArrayRequest = JsonArrayRequest(Request.Method.GET, url, null,
+            { response ->
+                studentLogsList.clear()
+                for (i in 0 until response.length()) { studentLogsList.add(response.getJSONObject(i)) }
+            },
+            { Toast.makeText(context, "Student has no reports yet.", Toast.LENGTH_SHORT).show() }
+        )
+        queue.add(jsonArrayRequest)
+    }
+
     LaunchedEffect(Unit) { loadAdminData() }
 
-    // NJIA MPYA: Function ya kufuta mtumiaji (DELETE request ya Spring Boot)
     fun deleteUser(userId: Long) {
         val url = "http://10.0.2.2:8085/api/admin/users/$userId"
         val queue = Volley.newRequestQueue(context)
@@ -518,10 +625,9 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         val deleteReq = JsonObjectRequest(Request.Method.DELETE, url, null,
             { _ ->
                 Toast.makeText(context, "User Deleted Successfully!", Toast.LENGTH_SHORT).show()
-                loadAdminData() // Inapakia upya data baada ya kufuta
+                loadAdminData()
             },
             { error ->
-                // Kama endpoint yako ya Spring Boot inarudisha text tupu au 200 bila body, Volley inaweza kuingia hapa.
                 if (error.networkResponse?.statusCode == 200) {
                     Toast.makeText(context, "User Deleted!", Toast.LENGTH_SHORT).show()
                     loadAdminData()
@@ -533,67 +639,136 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         queue.add(deleteReq)
     }
 
+    val filteredUsers = userList.filter { sysUser ->
+        val role = sysUser.optString("role", "STUDENT")
+        if (selectedTab == 0) role == "STUDENT" else role == "SUPERVISOR"
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("ADMIN: $adminName", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                Text("ADMIN: $adminName", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
                 Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
             }
         }
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("System Overview", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
-                    Text("Total Students: $totalStudents", fontSize = 15.sp)
-                    Text("Total Supervisors: $totalSupervisors", fontSize = 15.sp)
+        if (selectedStudentForLogs != null) {
+            val stName = selectedStudentForLogs!!.optString("full_name", selectedStudentForLogs!!.optString("fullName", "Student"))
+            val stCompany = selectedStudentForLogs!!.optString("company_name", selectedStudentForLogs!!.optString("companyName", "N/A"))
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("REPORTS OF: ${stName.uppercase()}", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                            Button(onClick = { selectedStudentForLogs = null }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Back") }
+                        }
+                        Text("Company Name: $stCompany", fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(vertical = 4.dp))
+                    }
                 }
             }
-        }
+            if (studentLogsList.isEmpty()) {
+                item { Text("No reports found for this student.", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
+            } else {
+                items(studentLogsList) { entry ->
+                    val date = entry.optString("entry_date", entry.optString("entryDate", "No Date"))
+                    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Status: ${entry.optString("status", "PENDING")}", fontWeight = FontWeight.Bold)
+                                Text("Date: $date", fontSize = 12.sp, color = Color.Gray)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("Activity: ${entry.optString("activity_description", entry.optString("activityDescription", ""))}")
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Grade Given: ${entry.optString("grade", "-")}", color = Color.Blue, fontWeight = FontWeight.Medium)
+                            Text("Feedback: ${entry.optString("feedback", "No Comment yet")}", color = Color.DarkGray)
+                        }
+                    }
+                }
+            }
+        } else {
+            item {
+                Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("System Overview", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
+                        Text("Total Students: $totalStudents", fontSize = 15.sp)
+                        Text("Total Supervisors: $totalSupervisors", fontSize = 15.sp)
+                    }
+                }
+            }
 
-        item {
-            Text(
-                text = "Manage All Registered Users",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                color = Color.DarkGray
-            )
-        }
-
-        // Kitanzi (Loop) ya kuonyesha kila mtumiaji na kitufe cha kudelete
-        items(userList) { sysUser ->
-            val id = sysUser.optLong("id")
-            val name = sysUser.optString("full_name", sysUser.optString("fullName", "No Name"))
-            val uEmail = sysUser.optString("email", "No Email")
-            val uRole = sysUser.optString("role", "STUDENT")
-
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            item {
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("STUDENTS ($totalStudents)", fontWeight = FontWeight.Bold) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("SUPERVISORS ($totalSupervisors)", fontWeight = FontWeight.Bold) }
+                    )
+                }
+            }
+
+            items(filteredUsers) { sysUser ->
+                val id = sysUser.optLong("id")
+                val name = sysUser.optString("full_name", sysUser.optString("fullName", "No Name"))
+                val uEmail = sysUser.optString("email", "No Email")
+                val uRole = sysUser.optString("role", "STUDENT")
+                val company = sysUser.optString("company_name", sysUser.optString("companyName", "-"))
+                val extraInfo = if (uRole == "STUDENT") {
+                    "Reg No: ${sysUser.optString("reg_number", sysUser.optString("regNumber", "-"))} | Company: $company"
+                } else {
+                    "Supervisor Account"
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(text = "Email: $uEmail", fontSize = 13.sp, color = Color.Gray)
+                        Text(text = extraInfo, fontSize = 13.sp, color = Color.DarkGray)
                         Text(text = "Role: $uRole", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1565C0))
-                    }
 
-                    // Kitufe cha kufuta mtumiaji
-                    Button(
-                        onClick = { deleteUser(id) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFCDD2)),
-                        modifier = Modifier.padding(start = 8.dp)
-                    ) {
-                        Text(text = "DELETE", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            if (uRole == "STUDENT") {
+                                Button(
+                                    onClick = {
+                                        selectedStudentForLogs = sysUser
+                                        fetchStudentLogbooks(id)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBBDEFB)),
+                                    modifier = Modifier.padding(end = 8.dp)
+                                ) {
+                                    Text("VIEW LOGS", color = Color(0xFF1565C0), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Button(
+                                onClick = { deleteUser(id) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFCDD2))
+                            ) {
+                                Text(text = "DELETE", color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }

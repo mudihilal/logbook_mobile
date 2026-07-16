@@ -87,8 +87,8 @@ class MainActivity : ComponentActivity() {
 
                     "REGISTER" -> {
                         RegisterScreen(
-                            onRegisterClick = { name, email, pass, role, regNo, compName, ctx ->
-                                registerUser(name, email, pass, role, regNo, compName, ctx) {
+                            onRegisterClick = { name, email, pass, role, regNo, compName, course, ctx ->
+                                registerUser(name, email, pass, role, regNo, compName, course, ctx) {
                                     currentScreen = "LOGIN"
                                 }
                             },
@@ -154,6 +154,7 @@ class MainActivity : ComponentActivity() {
         role: String,
         regNo: String?,
         compName: String?,
+        course: String?,
         context: Context,
         onComplete: () -> Unit
     ) {
@@ -172,11 +173,13 @@ class MainActivity : ComponentActivity() {
             jsonBody.put("reg_number", regNo)
             jsonBody.put("companyName", compName)
             jsonBody.put("company_name", compName)
+            jsonBody.put("course", course)
         } else {
             jsonBody.put("regNumber", JSONObject.NULL)
             jsonBody.put("reg_number", JSONObject.NULL)
-            jsonBody.put("companyName", JSONObject.NULL)
-            jsonBody.put("company_name", JSONObject.NULL)
+            jsonBody.put("companyName", compName ?: JSONObject.NULL)
+            jsonBody.put("company_name", compName ?: JSONObject.NULL)
+            jsonBody.put("course", JSONObject.NULL)
         }
 
         val jsonObjectRequest = JsonObjectRequest(
@@ -188,13 +191,12 @@ class MainActivity : ComponentActivity() {
             { error ->
                 val statusCode = error.networkResponse?.statusCode
                 val errorBody = try {
-                    error.networkResponse?.data?.let { String(it, Charsets.UTF_8) } ?: "No error body"
+                    error.networkResponse?.data?.let { String(it, Charsets.UTF_8) } ?: "No details provided"
                 } catch (_: Exception) {
-                    "Could not read error body"
+                    "Error reading registration payload"
                 }
-                Log.e("REG_ERROR", "Status Code: $statusCode")
-                Log.e("REG_ERROR", "Response Body: $errorBody")
-                Toast.makeText(context, "Error $statusCode: $errorBody", Toast.LENGTH_LONG).show()
+                Log.e("REG_ERROR", "Status Code: $statusCode | Body: $errorBody")
+                Toast.makeText(context, "Registration failed: $errorBody", Toast.LENGTH_LONG).show()
             }
         )
         queue.add(jsonObjectRequest)
@@ -215,7 +217,7 @@ fun LoginScreen(onLoginClick: (String, String, Context) -> Unit, onNavigateToReg
         verticalArrangement = Arrangement.Center
     ) {
         Text(text = "SYSTEM LOGIN", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-        Text(text = "Modern IPT Management System", fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 32.dp))
+        Text(text = "Industrial Practical Training Management", fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 32.dp))
 
         OutlinedTextField(
             value = email, onValueChange = { email = it },
@@ -244,21 +246,21 @@ fun LoginScreen(onLoginClick: (String, String, Context) -> Unit, onNavigateToReg
 
         Button(
             onClick = {
-                if (email.isNotEmpty() && password.isNotEmpty()) {
-                    onLoginClick(email, password, context)
+                if (email.trim().isNotEmpty() && password.trim().isNotEmpty()) {
+                    onLoginClick(email.trim(), password, context)
                 } else {
-                    Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "All fields are required!", Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
         ) {
-            Text(text = "LOGIN NOW", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(text = "LOGIN", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Don't have an account? Register here",
+            text = "Create an account instead",
             color = Color(0xFF1565C0), fontSize = 14.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.clickable { onNavigateToRegister() }
         )
@@ -267,7 +269,7 @@ fun LoginScreen(onLoginClick: (String, String, Context) -> Unit, onNavigateToReg
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, String?, Context) -> Unit, onNavigateToLogin: () -> Unit) {
+fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, String?, String?, Context) -> Unit, onNavigateToLogin: () -> Unit) {
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -275,6 +277,7 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
     var selectedRole by remember { mutableStateOf("STUDENT") }
     var regNumber by remember { mutableStateOf("") }
     var companyName by remember { mutableStateOf("") }
+    var course by remember { mutableStateOf("") }
     val context = LocalContext.current
 
     LazyColumn(
@@ -283,8 +286,8 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
         verticalArrangement = Arrangement.Center
     ) {
         item {
-            Text(text = "CREATE ACCOUNT", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
-            Text(text = "Join IPT Management System", fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 24.dp))
+            Text(text = "REGISTRATION", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+            Text(text = "Create your account", fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 24.dp))
 
             OutlinedTextField(value = fullName, onValueChange = { fullName = it }, label = { Text("Full Name") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
             OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email Address") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
@@ -308,7 +311,7 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
                 }
             )
 
-            Text(text = "Select Your Role:", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.fillMaxWidth())
+            Text(text = "Select Role:", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.fillMaxWidth())
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = (selectedRole == "STUDENT"), onClick = { selectedRole = "STUDENT" })
                 Text(text = "Student", modifier = Modifier.padding(end = 8.dp))
@@ -322,29 +325,33 @@ fun RegisterScreen(onRegisterClick: (String, String, String, String, String?, St
 
             if (selectedRole == "STUDENT") {
                 OutlinedTextField(value = regNumber, onValueChange = { regNumber = it }, label = { Text("Registration Number") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
-                OutlinedTextField(value = companyName, onValueChange = { companyName = it }, label = { Text("Place of IPT / Company Name") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+                OutlinedTextField(value = course, onValueChange = { course = it }, label = { Text("Course of Study (e.g. Mechanics)") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
+                OutlinedTextField(value = companyName, onValueChange = { companyName = it }, label = { Text("Place of IPT (Company Name)") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+            } else if (selectedRole == "SUPERVISOR") {
+                OutlinedTextField(value = companyName, onValueChange = { companyName = it }, label = { Text("Assigned Institution") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    if (fullName.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty()) {
-                        val regToSend = if (selectedRole == "STUDENT") regNumber else null
-                        val compToSend = if (selectedRole == "STUDENT") companyName else null
-                        onRegisterClick(fullName, email, password, selectedRole, regToSend, compToSend, context)
+                    if (fullName.trim().isNotEmpty() && email.trim().isNotEmpty() && password.trim().isNotEmpty()) {
+                        val regToSend = if (selectedRole == "STUDENT") regNumber.trim() else null
+                        val compToSend = if (selectedRole == "STUDENT" || selectedRole == "SUPERVISOR") companyName.trim() else null
+                        val courseToSend = if (selectedRole == "STUDENT") course.trim() else null
+                        onRegisterClick(fullName.trim(), email.trim(), password, selectedRole, regToSend, compToSend, courseToSend, context)
                     } else {
-                        Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Please fill out all required fields.", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
             ) {
-                Text(text = "REGISTER NOW", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = "REGISTER", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text(text = "Already have an account? Login here", color = Color(0xFF2E7D32), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onNavigateToLogin() })
+            Text(text = "Already registered? Go to Login", color = Color(0xFF2E7D32), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onNavigateToLogin() })
         }
     }
 }
@@ -368,7 +375,7 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 logbookEntries.clear()
                 for (i in 0 until response.length()) { logbookEntries.add(response.getJSONObject(i)) }
             },
-            { Toast.makeText(context, "Failed to load logbook history.", Toast.LENGTH_SHORT).show() }
+            { Log.e("STUDENT_DASHBOARD", "Failed to fetch student logs.") }
         )
         queue.add(jsonArrayRequest)
     }
@@ -378,7 +385,6 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     fun submitLogbook(description: String) {
         val url = "http://10.0.2.2:8085/api/logbook/submit"
         val queue = Volley.newRequestQueue(context)
-
         val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
         val jsonBody = JSONObject()
@@ -393,11 +399,11 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
 
         val jsonObjectRequest = JsonObjectRequest(Request.Method.POST, url, jsonBody,
             { _ ->
-                Toast.makeText(context, "Logbook Submitted Successfully!", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Report submitted successfully!", Toast.LENGTH_LONG).show()
                 activityDescription = ""
                 fetchLogbooks()
             },
-            { Toast.makeText(context, "Failed to submit logbook.", Toast.LENGTH_SHORT).show() }
+            { Toast.makeText(context, "Submission failed.", Toast.LENGTH_SHORT).show() }
         )
         queue.add(jsonObjectRequest)
     }
@@ -416,13 +422,13 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Submit Daily Activity Report", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
-                    OutlinedTextField(value = activityDescription, onValueChange = { activityDescription = it }, label = { Text("Describe practical work...") }, modifier = Modifier.fillMaxWidth().height(120.dp).padding(bottom = 16.dp))
-                    Button(onClick = { if (activityDescription.isNotEmpty()) submitLogbook(activityDescription) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("SUBMIT REPORT") }
+                    OutlinedTextField(value = activityDescription, onValueChange = { activityDescription = it }, label = { Text("Describe today's work details...") }, modifier = Modifier.fillMaxWidth().height(120.dp).padding(bottom = 16.dp))
+                    Button(onClick = { if (activityDescription.trim().isNotEmpty()) submitLogbook(activityDescription.trim()) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("SUBMIT") }
                 }
             }
         }
         items(logbookEntries) { entry ->
-            val date = entry.optString("entry_date", entry.optString("entryDate", "No Date"))
+            val date = entry.optString("entry_date", entry.optString("entryDate", "N/A"))
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -430,9 +436,9 @@ fun StudentDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                         Text(text = "Date: $date", fontSize = 12.sp, color = Color.DarkGray)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")))
+                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Details")))
                     Text(text = "Grade: ${entry.optString("grade", "-")}", color = Color.Blue)
-                    Text(text = "Feedback: ${entry.optString("feedback", "No comment")}", color = Color.Gray)
+                    Text(text = "Feedback: ${entry.optString("feedback", "No supervisor feedback yet")}", color = Color.Gray)
                 }
             }
         }
@@ -448,7 +454,9 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     var selectedEntryId by remember { mutableLongStateOf(-1L) }
     var inputGrade by remember { mutableStateOf("") }
     var inputFeedback by remember { mutableStateOf("") }
+
     val supervisorName = user.optString("full_name", user.optString("fullName", "Supervisor"))
+    val supervisorInstitution = user.optString("company_name", user.optString("companyName", "N/A"))
 
     fun fetchAllLogbooks() {
         val url = "http://10.0.2.2:8085/api/logbook/pending"
@@ -458,7 +466,7 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 allEntries.clear()
                 for (i in 0 until response.length()) { allEntries.add(response.getJSONObject(i)) }
             },
-            { Toast.makeText(context, "Error fetching data", Toast.LENGTH_SHORT).show() }
+            { Log.e("SUPERVISOR", "Error loading logbooks list") }
         )
         queue.add(jsonArrayRequest)
     }
@@ -470,38 +478,59 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         val queue = Volley.newRequestQueue(context)
         val body = JSONObject()
         body.put("status", status)
-        body.put("grade", if (status == "APPROVED") grade else "-")
-        body.put("feedback", feedback)
+        body.put("grade", if (status == "APPROVED") grade.uppercase().trim() else "-")
+        body.put("feedback", feedback.trim())
 
         val req = JsonObjectRequest(Request.Method.PUT, url, body,
             { _ ->
                 selectedEntryId = -1L
                 fetchAllLogbooks()
-                Toast.makeText(context, "Review Saved ($status)!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Review complete: $status", Toast.LENGTH_SHORT).show()
             },
-            { Toast.makeText(context, "Failed to update", Toast.LENGTH_SHORT).show() }
+            { Toast.makeText(context, "Failed to submit review.", Toast.LENGTH_SHORT).show() }
         )
         queue.add(req)
     }
 
+    val filteredEntries = allEntries.filter { entry ->
+        val studentComp = entry.optJSONObject("student")?.optString("companyName", entry.optJSONObject("student")?.optString("company_name", ""))
+            ?: entry.optString("company_name", entry.optString("companyName", ""))
+
+        studentComp.equals(supervisorInstitution, ignoreCase = true)
+    }
+
+    val uniqueStudentsCount = filteredEntries.map { entry ->
+        entry.optJSONObject("student")?.optLong("id") ?: entry.optLong("student_id")
+    }.distinct().size
+
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         item {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("SUPERVISOR: $supervisorName", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                 Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
+            }
+            Text("Assigned Hub: $supervisorInstitution", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Total Assigned Students: $uniqueStudentsCount", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                }
             }
         }
         if (selectedEntryId != -1L) {
             item {
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Review Logbook Report", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                        OutlinedTextField(value = inputGrade, onValueChange = { inputGrade = it }, label = { Text("Grade (e.g. A, B, C)") }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
-                        OutlinedTextField(value = inputFeedback, onValueChange = { inputFeedback = it }, label = { Text("Feedback / Comment") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+                        Text("Review Daily Report", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        OutlinedTextField(value = inputGrade, onValueChange = { inputGrade = it }, label = { Text("Assign Grade (A, B, C, D, F)") }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                        OutlinedTextField(value = inputFeedback, onValueChange = { inputFeedback = it }, label = { Text("Remarks / Feedback") }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                             Button(
-                                onClick = { reviewLogbook(selectedEntryId, inputGrade, inputFeedback, "APPROVED") },
+                                onClick = { if (inputGrade.trim().isNotEmpty()) reviewLogbook(selectedEntryId, inputGrade, inputFeedback, "APPROVED") else Toast.makeText(context, "Provide a grade first!", Toast.LENGTH_SHORT).show() },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                             ) { Text("APPROVE") }
 
@@ -519,37 +548,49 @@ fun SupervisorDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 }
             }
         }
-        items(allEntries) { entry ->
-            val date = entry.optString("entry_date", entry.optString("entryDate", "No Date"))
-
-            val studentName = entry.optJSONObject("student")?.optString("fullName", "Student")
-                ?: entry.optString("student_name", "Unknown Student")
-            val regNo = entry.optJSONObject("student")?.optString("regNumber", "N/A")
-                ?: entry.optString("reg_number", "N/A")
-            val companyName = entry.optJSONObject("student")?.optString("companyName", "N/A")
-                ?: entry.optString("company_name", "N/A")
-            val currentStatus = entry.optString("status", "PENDING")
-
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedEntryId = entry.optLong("id") },
-                colors = CardDefaults.cardColors(
-                    containerColor = when(currentStatus) {
-                        "APPROVED" -> Color(0xFFE8F5E9)
-                        "REJECTED" -> Color(0xFFFFEBEE)
-                        else -> Color.White
-                    }
+        if (filteredEntries.isEmpty()) {
+            item {
+                Text(
+                    "No pending reports for $supervisorInstitution.",
+                    modifier = Modifier.padding(16.dp),
+                    color = Color.Gray
                 )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Logbook ID: #${entry.optLong("id")} ($currentStatus)", fontWeight = FontWeight.Bold)
-                        Text(text = date, fontSize = 12.sp, color = Color.Gray)
+            }
+        } else {
+            items(filteredEntries) { entry ->
+                val date = entry.optString("entry_date", entry.optString("entryDate", "N/A"))
+
+                val studentName = entry.optJSONObject("student")?.optString("fullName", "Student")
+                    ?: entry.optString("student_name", "Anonymous")
+                val regNo = entry.optJSONObject("student")?.optString("regNumber", "N/A")
+                    ?: entry.optString("reg_number", "N/A")
+                val studentCourse = entry.optJSONObject("student")?.optString("course", "Not Specified")
+                    ?: entry.optString("course", "Not Specified")
+                val currentStatus = entry.optString("status", "PENDING")
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selectedEntryId = entry.optLong("id") },
+                    colors = CardDefaults.cardColors(
+                        containerColor = when(currentStatus) {
+                            "APPROVED" -> Color(0xFFE8F5E9)
+                            "REJECTED" -> Color(0xFFFFEBEE)
+                            else -> Color.White
+                        }
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "LOG ID: #${entry.optLong("id")} ($currentStatus)", fontWeight = FontWeight.Bold)
+                            Text(text = date, fontSize = 12.sp, color = Color.Gray)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Student Name: $studentName", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(text = "Reg No: $regNo", fontSize = 13.sp, color = Color.DarkGray)
+                        // Student's course highlighted clearly to assist the supervisor:
+                        Text(text = "Course: $studentCourse", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No details")), fontSize = 14.sp)
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Student: $studentName", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Text(text = "Reg No: $regNo | Company: $companyName", fontSize = 12.sp, color = Color.DarkGray)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = entry.optString("activity_description", entry.optString("activityDescription", "No Description")), fontSize = 14.sp)
                 }
             }
         }
@@ -567,7 +608,6 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
     val adminId = user.optLong("id", -1L)
 
     var selectedTab by remember { mutableIntStateOf(0) }
-
     var selectedStudentForLogs by remember { mutableStateOf<JSONObject?>(null) }
     val studentLogsList = remember { mutableStateListOf<JSONObject>() }
 
@@ -580,7 +620,7 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 totalStudents = res.optLong("total_students", res.optLong("totalStudents", 0L))
                 totalSupervisors = res.optLong("total_supervisors", res.optLong("totalSupervisors", 0L))
             },
-            { Log.e("ADMIN_ERR", "Failed stats") }
+            { Log.e("ADMIN", "Could not fetch registration counters.") }
         )
         queue.add(statsReq)
 
@@ -598,7 +638,7 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                     }
                 }
             },
-            { Log.e("ADMIN_ERR", "Failed to fetch users list") }
+            { Log.e("ADMIN", "Error pulling complete user records.") }
         )
         queue.add(usersReq)
     }
@@ -611,7 +651,7 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 studentLogsList.clear()
                 for (i in 0 until response.length()) { studentLogsList.add(response.getJSONObject(i)) }
             },
-            { Toast.makeText(context, "Student has no reports yet.", Toast.LENGTH_SHORT).show() }
+            { Log.e("ADMIN", "No logs returned for student #$studentId") }
         )
         queue.add(jsonArrayRequest)
     }
@@ -624,15 +664,15 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
 
         val deleteReq = JsonObjectRequest(Request.Method.DELETE, url, null,
             { _ ->
-                Toast.makeText(context, "User Deleted Successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Deleted Successfully!", Toast.LENGTH_SHORT).show()
                 loadAdminData()
             },
             { error ->
                 if (error.networkResponse?.statusCode == 200) {
-                    Toast.makeText(context, "User Deleted!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Deleted!", Toast.LENGTH_SHORT).show()
                     loadAdminData()
                 } else {
-                    Toast.makeText(context, "Failed to delete user.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Failed to remove user account.", Toast.LENGTH_SHORT).show()
                 }
             }
         )
@@ -644,13 +684,22 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         if (selectedTab == 0) role == "STUDENT" else role == "SUPERVISOR"
     }
 
+    // Advanced dashboard groupings:
+    val studentsByCompany = userList.filter { it.optString("role") == "STUDENT" }
+        .groupBy { it.optString("company_name", it.optString("companyName", "Other Locations")) }
+        .mapValues { it.value.size }
+
+    val studentsByCourse = userList.filter { it.optString("role") == "STUDENT" }
+        .groupBy { it.optString("course", "Unspecified Course") }
+        .mapValues { it.value.size }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("ADMIN: $adminName", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                Text("ADMIN PANEL: $adminName", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
                 Button(onClick = onLogout, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Logout") }
             }
         }
@@ -658,6 +707,7 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
         if (selectedStudentForLogs != null) {
             val stName = selectedStudentForLogs!!.optString("full_name", selectedStudentForLogs!!.optString("fullName", "Student"))
             val stCompany = selectedStudentForLogs!!.optString("company_name", selectedStudentForLogs!!.optString("companyName", "N/A"))
+            val stCourse = selectedStudentForLogs!!.optString("course", "N/A")
 
             item {
                 Card(
@@ -666,18 +716,19 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("REPORTS OF: ${stName.uppercase()}", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
+                            Text("REPORTS: ${stName.uppercase()}", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0))
                             Button(onClick = { selectedStudentForLogs = null }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Back") }
                         }
-                        Text("Company Name: $stCompany", fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(vertical = 4.dp))
+                        Text("Course of Study: $stCourse", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("Assigned Hub: $stCompany", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     }
                 }
             }
             if (studentLogsList.isEmpty()) {
-                item { Text("No reports found for this student.", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
+                item { Text("No logbook entries on record.", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
             } else {
                 items(studentLogsList) { entry ->
-                    val date = entry.optString("entry_date", entry.optString("entryDate", "No Date"))
+                    val date = entry.optString("entry_date", entry.optString("entryDate", "N/A"))
                     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -685,10 +736,10 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                                 Text("Date: $date", fontSize = 12.sp, color = Color.Gray)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text("Activity: ${entry.optString("activity_description", entry.optString("activityDescription", ""))}")
+                            Text("Description: ${entry.optString("activity_description", entry.optString("activityDescription", ""))}")
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Grade Given: ${entry.optString("grade", "-")}", color = Color.Blue, fontWeight = FontWeight.Medium)
-                            Text("Feedback: ${entry.optString("feedback", "No Comment yet")}", color = Color.DarkGray)
+                            Text("Assigned Grade: ${entry.optString("grade", "-")}", color = Color.Blue, fontWeight = FontWeight.Medium)
+                            Text("Feedback Remarks: ${entry.optString("feedback", "No Comments Provided")}", color = Color.DarkGray)
                         }
                     }
                 }
@@ -697,9 +748,21 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
             item {
                 Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("System Overview", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
-                        Text("Total Students: $totalStudents", fontSize = 15.sp)
-                        Text("Total Supervisors: $totalSupervisors", fontSize = 15.sp)
+                        Text("System Overview Statistics", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 12.dp))
+                        Text("Total Registered Students: $totalStudents", fontSize = 14.sp)
+                        Text("Total Active Supervisors: $totalSupervisors", fontSize = 14.sp)
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("MAPPING BY HUB (INSTITUTION):", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1565C0))
+                        studentsByCompany.forEach { (company, count) ->
+                            Text("• $company: $count students", fontSize = 13.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("MAPPING BY FIELD OF STUDY:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF2E7D32))
+                        studentsByCourse.forEach { (courseName, count) ->
+                            Text("• $courseName: $count students", fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -728,10 +791,12 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                 val uEmail = sysUser.optString("email", "No Email")
                 val uRole = sysUser.optString("role", "STUDENT")
                 val company = sysUser.optString("company_name", sysUser.optString("companyName", "-"))
+                val field = sysUser.optString("course", "-")
+
                 val extraInfo = if (uRole == "STUDENT") {
-                    "Reg No: ${sysUser.optString("reg_number", sysUser.optString("regNumber", "-"))} | Company: $company"
+                    "Reg No: ${sysUser.optString("reg_number", sysUser.optString("regNumber", "-"))}\nCourse: $field\nCompany: $company"
                 } else {
-                    "Supervisor Account"
+                    "Supervisor\nAssigned Hub: $company"
                 }
 
                 Card(
@@ -742,8 +807,10 @@ fun AdminDashboardScreen(user: JSONObject, onLogout: () -> Unit) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(text = "Email: $uEmail", fontSize = 13.sp, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(text = extraInfo, fontSize = 13.sp, color = Color.DarkGray)
-                        Text(text = "Role: $uRole", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1565C0))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Access Role: $uRole", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1565C0))
 
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
